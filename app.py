@@ -41,6 +41,7 @@ from game.logic import (
     has_won,
     max_value,
 )
+from esconder_selo import esconder_selo_streamlit
 
 APP_DIR = Path(__file__).parent
 CSS_PATH = APP_DIR / "static" / "style.css"
@@ -62,6 +63,7 @@ MOVES = {
 # CONFIGURAÇÃO DA PÁGINA
 # --------------------------------------------------------------------------
 st.set_page_config(page_title="DAX 2048", page_icon="🧮", layout="centered")
+esconder_selo_streamlit()  # oculta os controles do Streamlit Cloud
 
 
 def load_css(path: Path) -> None:
