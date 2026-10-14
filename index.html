@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DAX 2048</title>
+<meta name="description" content="Aprenda medidas DAX (Power BI) jogando 2048: cada peça é uma função, do SUM ao Mestre DAX.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧮</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Nunito+Sans:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #faf8ef;
+  --ink: #3f3a33;
+  --ink-2: #776e65;
+  --panel: #bbada0;
+  --empty: #cdc1b4;
+  --card: #ffffff;
+  --line: #e4ddd1;
+  --accent: #8f7a66;
+  --gold: #edc22e;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1b1916; --ink: #f1ebe2; --ink-2: #b4aa9d; --panel: #4a433b; --empty: #5d554c;
+    --card: #26231f; --line: #3a352f; --accent: #b39b84; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1b1916; --ink: #f1ebe2; --ink-2: #b4aa9d; --panel: #4a433b; --empty: #5d554c;
+  --card: #26231f; --line: #3a352f; --accent: #b39b84; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 400 15px/1.5 "Nunito Sans", system-ui, sans-serif;
+  display: flex; justify-content: center;
+  overscroll-behavior: none;
+}
+.app { width: 100%; max-width: 480px; padding: 18px 16px 24px; }
+
+header { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: start; }
+h1 { font: 800 30px/1 "Nunito Sans", sans-serif; margin: 0; letter-spacing: -.02em; }
+.sub { font-size: 13px; color: var(--ink-2); margin: 4px 0 0; }
+.score { background: var(--panel); color: #fff; border-radius: 8px; padding: 6px 12px; text-align: center; min-width: 74px; }
+.score .l { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .85; font-weight: 800; }
+.score .v { font: 800 19px/1.2 "Nunito Sans", sans-serif; font-variant-numeric: tabular-nums; }
+.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; min-height: 0; }
+.badge { font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 99px; }
+.badge.over { background: #f6564033; color: #c0392b; }
+.badge.won { background: #edc22e33; color: #a67c00; }
+.badge.daily { background: #4a90d933; color: #2b6cb0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .badge.over { color: #ff8a7a; } :root:not([data-theme="light"]) .badge.won { color: #f3d36b; } :root:not([data-theme="light"]) .badge.daily { color: #8cbcf0; } }
+
+.meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink-2); margin: 12px 0 4px; }
+.bar { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: linear-gradient(90deg, #f2b179, var(--gold)); width: 0; transition: width .3s; }
+
+.board-wrap { position: relative; margin-top: 14px; touch-action: none; user-select: none; -webkit-user-select: none; }
+.board { --n: 4; --gap: 10px; background: var(--panel); border-radius: 10px; padding: var(--gap); display: grid; grid-template-columns: repeat(var(--n), 1fr); gap: var(--gap); }
+.tile {
+  aspect-ratio: 1; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-family: "JetBrains Mono", Consolas, monospace; font-weight: 800; line-height: 1; text-align: center;
+  background: var(--empty); color: transparent; container-type: inline-size;
+}
+.tile span { font-size: clamp(11px, 30cqi, 30px); }
+.tile.long span { font-size: clamp(10px, 23cqi, 24px); }
+.tile.pop { animation: pop .2s cubic-bezier(.34, 1.56, .64, 1); }
+.tile.merged { animation: pop .2s cubic-bezier(.34, 1.56, .64, 1), glow .55s ease-out; }
+@keyframes pop { 0% { transform: scale(.7); opacity: .4; } 70% { transform: scale(1.07); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes glow { 0% { box-shadow: 0 0 0 3px var(--gold), 0 0 20px 6px #edc22ecc; } 100% { box-shadow: 0 0 0 3px transparent, 0 0 0 0 transparent; } }
+
+.overlay { position: absolute; inset: 0; border-radius: 10px; background: color-mix(in srgb, var(--bg) 78%, transparent); display: none; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; }
+.overlay.show { display: flex; animation: fade .3s; }
+.overlay h2 { font: 800 28px/1.1 "Nunito Sans", sans-serif; margin: 0; }
+@keyframes fade { from { opacity: 0; } }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.more { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+button { font: 800 14px "Nunito Sans", sans-serif; cursor: pointer; border-radius: 8px; min-height: 42px; padding: 0 12px; }
+.btn { background: var(--accent); color: #fff; border: 0; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.hint { text-align: center; font-size: 12px; color: var(--ink-2); margin-top: 14px; }
+kbd { font: 600 11px "JetBrains Mono", monospace; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--card); }
+
+dialog { border: 0; border-radius: 14px; padding: 0; width: min(440px, calc(100vw - 32px)); max-height: min(80vh, 640px); background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.3); }
+dialog::backdrop { background: rgba(30, 25, 20, .45); }
+.dlg-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 18px 8px; position: sticky; top: 0; background: var(--card); }
+.dlg-head h2 { font-size: 18px; margin: 0; }
+.dlg-body { padding: 4px 18px 18px; overflow: auto; }
+.x { background: none; border: 0; font-size: 22px; min-height: 0; padding: 4px 8px; color: var(--ink-2); }
+.lvl { display: grid; grid-template-columns: 52px 1fr; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
+.lvl .chip { width: 52px; height: 52px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font: 800 14px "JetBrains Mono", monospace; }
+.lvl.locked .chip { filter: grayscale(1); opacity: .45; }
+.lvl b { display: block; }
+.lvl p { margin: 2px 0 6px; font-size: 13px; color: var(--ink-2); }
+pre { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; font: 600 12px/1.45 "JetBrains Mono", monospace; white-space: pre-wrap; word-break: break-word; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 6px 0 18px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.dlg-body ul { padding-left: 18px; margin: 0; }
+.dlg-body li { margin: 6px 0; }
+.label { font-size: 13px; color: var(--ink-2); margin: 8px 0 0; }
+
+.toasts { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); display: flex; flex-direction: column; gap: 8px; width: min(420px, calc(100vw - 32px)); z-index: 10; pointer-events: none; }
+.toast { background: var(--ink); color: var(--bg); border-radius: 10px; padding: 12px 14px; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.25); animation: up .3s ease-out; }
+.toast b { display: block; margin-bottom: 2px; }
+.toast.out { opacity: 0; transform: translateY(8px); transition: .3s; }
+@keyframes up { from { transform: translateY(12px); opacity: 0; } }
+canvas#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+
+@media (max-height: 700px) { .app { padding-top: 10px; } h1 { font-size: 24px; } .board { --gap: 8px; } }
+@media (prefers-reduced-motion: reduce) { .tile.pop, .tile.merged { animation: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div>
+      <h1>🧮 DAX 2048</h1>
+      <p class="sub">Funda medidas iguais e evolua no DAX</p>
+      <div class="badges" id="badges"></div>
+    </div>
+    <div class="score"><div class="l">Pontos</div><div class="v" id="score">0</div></div>
+    <div class="score"><div class="l">Recorde</div><div class="v" id="best">0</div></div>
+  </header>
+
+  <div class="meta"><span id="moves">Movimentos: 0</span><span id="trail">Progresso na trilha DAX</span></div>
+  <div class="bar" role="progressbar" aria-label="Progresso na trilha DAX"><i id="bar"></i></div>
+
+  <div class="board-wrap" id="boardWrap">
+    <div class="board" id="board" aria-label="Tabuleiro" role="grid"></div>
+    <div class="overlay" id="overlay">
+      <h2 id="ovTitle">Fim de jogo</h2>
+      <p id="ovText" style="margin:0;color:var(--ink-2)"></p>
+      <div style="display:flex;gap:10px">
+        <button class="ghost" id="ovUndo">↩️ Desfazer</button>
+        <button class="btn" id="ovRestart">🔄 Jogar de novo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="ghost" id="undo" disabled>↩️ Desfazer</button>
+    <button class="btn" id="restart">🔄 Reiniciar</button>
+  </div>
+  <div class="more">
+    <button class="ghost" data-open="dlgDict">📖 Dicionário</button>
+    <button class="ghost" data-open="dlgOpts">⚙️ Opções</button>
+    <button class="ghost" data-open="dlgHelp">❓ Como jogar</button>
+  </div>
+  <p class="hint">Use <kbd>↑</kbd> <kbd>↓</kbd> <kbd>←</kbd> <kbd>→</kbd> ou deslize no tabuleiro · <kbd>Z</kbd> desfaz · <kbd>R</kbd> reinicia</p>
+</div>
+
+<dialog id="dlgDict" aria-labelledby="dictT">
+  <div class="dlg-head"><h2 id="dictT">📖 Dicionário DAX</h2><button class="x" data-close aria-label="Fechar">×</button></div>
+  <div class="dlg-body"><p class="label" style="margin:0 0 8px">Trilha de níveis do jogo, do mais simples ao mais avançado:</p><div id="dictList"></div></div>
+</dialog>
+
+<dialog id="dlgOpts" aria-labelledby="optsT">
+  <div class="dlg-head"><h2 id="optsT">⚙️ Opções</h2><button class="x" data-close aria-label="Fechar">×</button></div>
+  <div class="dlg-body">
+    <p class="label">Tamanho do tabuleiro (dificuldade)</p>
+    <div class="seg" id="sizes"></div>
+    <p class="label">Modo diário — o mesmo tabuleiro para todo mundo hoje</p>
+    <button class="ghost" id="daily" style="width:100%;margin-top:6px"></button>
+  </div>
+</dialog>
+
+<dialog id="dlgHelp" aria-labelledby="helpT">
+  <div class="dlg-head"><h2 id="helpT">❓ Como jogar</h2><button class="x" data-close aria-label="Fechar">×</button></div>
+  <div class="dlg-body">
+    <ul>
+      <li>Use as <b>setas do teclado</b> (↑ ↓ ← →) ou <b>deslize o dedo</b> no tabuleiro para mover as peças.</li>
+      <li>Peças com a <b>mesma função DAX</b> se fundem, virando o próximo nível.</li>
+      <li><b>Z</b> ou ↩️ desfaz a última jogada (uma vez).</li>
+      <li>Pressione <b>R</b> ou clique em 🔄 para reiniciar.</li>
+      <li>Chegue ao 🏆 <b>MESTRE DAX</b> (peça 2048) — e continue jogando depois!</li>
+      <li>Em ⚙️ Opções dá para mudar o tamanho do tabuleiro ou jogar o desafio diário.</li>
+    </ul>
+  </div>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<canvas id="confetti" hidden></canvas>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------------------------------------------------------------- conteúdo
+  const DAX = {
+    2:    { abbr: "SUM",  name: "SUM", desc: "Soma todos os valores de uma coluna numérica.", ex: "Total Vendas = SUM(Vendas[Valor])", c: ["#eee4da", "#776e65"] },
+    4:    { abbr: "AVG",  name: "AVERAGE", desc: "Calcula a média aritmética dos valores de uma coluna.", ex: "Ticket Médio = AVERAGE(Vendas[Valor])", c: ["#ede0c8", "#776e65"] },
+    8:    { abbr: "CNT",  name: "COUNTROWS", desc: "Conta o número de linhas de uma tabela ou tabela filtrada.", ex: "Qtd Pedidos = COUNTROWS(Vendas)", c: ["#f2b179", "#f9f6f2"] },
+    16:   { abbr: "DCNT", name: "DISTINCTCOUNT", desc: "Conta valores distintos (únicos) de uma coluna.", ex: "Clientes Únicos = DISTINCTCOUNT(Vendas[ClienteID])", c: ["#f59563", "#f9f6f2"] },
+    32:   { abbr: "CALC", name: "CALCULATE", desc: "Recalcula uma medida em um novo contexto de filtro. A função mais importante do DAX.", ex: "Vendas 2024 = CALCULATE([Total Vendas], Calendario[Ano] = 2024)", c: ["#f67c5f", "#f9f6f2"] },
+    64:   { abbr: "FILT", name: "FILTER", desc: "Retorna uma tabela filtrada linha a linha, usada dentro de CALCULATE.", ex: "Vendas Premium = CALCULATE([Total Vendas], FILTER(Vendas, Vendas[Valor] > 1000))", c: ["#f65e3b", "#f9f6f2"] },
+    128:  { abbr: "ALL",  name: "ALL", desc: "Remove filtros de uma coluna/tabela — essencial para calcular % do total.", ex: "% do Total = DIVIDE([Total Vendas], CALCULATE([Total Vendas], ALL(Vendas)))", c: ["#edcf72", "#f9f6f2"] },
+    256:  { abbr: "SUMX", name: "SUMX", desc: "Itera linha a linha e soma uma expressão calculada (função 'X' / iteradora).", ex: "Receita = SUMX(Vendas, Vendas[Qtd] * Vendas[Preco])", c: ["#edcc61", "#f9f6f2"] },
+    512:  { abbr: "REL",  name: "RELATED", desc: "Busca um valor em uma tabela relacionada (lado 'um' do relacionamento).", ex: "Categoria = RELATED(Produtos[Categoria])", c: ["#edc850", "#f9f6f2"] },
+    1024: { abbr: "VAR",  name: "VAR / RETURN", desc: "Cria variáveis para organizar e otimizar cálculos DAX complexos.", ex: "VAR TotalAtual = [Total Vendas]\nRETURN TotalAtual * 1.1", c: ["#edc53f", "#f9f6f2"] },
+    2048: { abbr: "🏆",   name: "MESTRE DAX", desc: "Parabéns! Você percorreu do SUM básico até conceitos avançados de medidas DAX.", ex: "Continue praticando no Power BI Desktop 🚀", c: ["#edc22e", "#f9f6f2"] },
+  };
+  const ORDER = Object.keys(DAX).map(Number);
+  const WIN = 2048, FOUR_CHANCE = 0.1, SIZES = [4, 5, 6];
+  const level = (v) => DAX[v] || { abbr: String(v), name: `Nível ${v}`, desc: "Nível avançado sem função específica associada.", ex: "", c: ["#3c3a32", "#f9f6f2"] };
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  // --------------------------------------------------------- armazenamento
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  };
+
+  // ------------------------------------------------------------ aleatório
+  // Mulberry32 com semente = data de hoje no modo diário (mesmo tabuleiro para todos).
+  function seeded(seedStr) {
+    let h = 1779033703 ^ seedStr.length;
+    for (let i = 0; i < seedStr.length; i++) { h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+    let a = h >>> 0;
+    return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  const hoje = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+  // ------------------------------------------------------- lógica (igual ao 2048)
+  function addRandomTile(g, rng) {
+    const empty = [];
+    g.forEach((row, r) => row.forEach((v, c) => { if (!v) empty.push([r, c]); }));
+    if (!empty.length) return null;
+    const [r, c] = empty[Math.floor(rng() * empty.length)];
+    g[r][c] = rng() < FOUR_CHANCE ? 4 : 2;
+    return [r, c];
+  }
+  function slideRow(row) {
+    const nz = row.filter((v) => v);
+    const out = [], merged = [];
+    let gained = 0;
+    for (let i = 0; i < nz.length; i++) {
+      if (i + 1 < nz.length && nz[i] === nz[i + 1]) { out.push(nz[i] * 2); merged.push(true); gained += nz[i] * 2; i++; }
+      else { out.push(nz[i]); merged.push(false); }
+    }
+    while (out.length < row.length) { out.push(0); merged.push(false); }
+    return { out, merged, gained };
+  }
+  const transpose = (g) => g[0].map((_, c) => g.map((row) => row[c]));
+  function move(g, dir) {
+    let rows = dir === "up" || dir === "down" ? transpose(g) : g.map((r) => r.slice());
+    const rev = dir === "right" || dir === "down";
+    let gained = 0;
+    const res = rows.map((row) => {
+      const s = slideRow(rev ? row.slice().reverse() : row);
+      gained += s.gained;
+      return rev ? { out: s.out.reverse(), merged: s.merged.reverse() } : s;
+    });
+    let grid = res.map((r) => r.out), mask = res.map((r) => r.merged);
+    if (dir === "up" || dir === "down") { grid = transpose(grid); mask = transpose(mask); }
+    return { grid, mask, gained };
+  }
+  const equal = (a, b) => a.every((row, r) => row.every((v, c) => v === b[r][c]));
+  const canMove = (g) => g.some((row, r) => row.some((v, c) => !v || (c + 1 < row.length && v === row[c + 1]) || (r + 1 < g.length && v === g[r + 1][c])));
+  const maxVal = (g) => Math.max(...g.flat());
+
+  // ------------------------------------------------------------------ estado
+  let S = null, rng = Math.random;
+
+  function newBoard(size, daily) {
+    rng = daily ? seeded(`${hoje()}-${size}`) : Math.random;
+    const grid = Array.from({ length: size }, () => Array(size).fill(0));
+    const fresh = [addRandomTile(grid, rng), addRandomTile(grid, rng)];
+    S = { size, daily, grid, score: 0, moves: 0, over: false, wonShown: false, unlocked: [2, 4], undo: null, mask: null, fresh, date: daily ? hoje() : null };
+    save(); render(true);
+  }
+  function save() { store.set("dax2048:state", { ...S, mask: null, fresh: null }); }
+  function bestOf(size) { return store.get("dax2048:best", {})[size] || 0; }
+  function setBest() {
+    const b = store.get("dax2048:best", {});
+    if (S.score > (b[S.size] || 0)) { b[S.size] = S.score; store.set("dax2048:best", b); }
+  }
+
+  function doMove(dir) {
+    if (S.over || document.querySelector("dialog[open]")) return;
+    const old = S.grid.map((r) => r.slice());
+    const { grid, mask, gained } = move(S.grid, dir);
+    if (equal(old, grid)) return;
+
+    S.undo = { grid: old, score: S.score, moves: S.moves, unlocked: S.unlocked.slice() };
+    const oldMax = maxVal(old), newMax = maxVal(grid);
+    if (newMax > oldMax && !S.unlocked.includes(newMax)) {
+      S.unlocked.push(newMax);
+      const l = level(newMax);
+      toast(`<b>📊 ${esc(l.name)} desbloqueada!</b>${esc(l.desc)}`);
+    }
+    S.fresh = [addRandomTile(grid, rng)];
+    S.grid = grid; S.mask = mask; S.score += gained; S.moves++;
+    setBest();
+
+    if (S.grid.flat().some((v) => v >= WIN) && !S.wonShown) {
+      S.wonShown = true;
+      toast("<b>🎉 Você alcançou MESTRE DAX!</b>Pode continuar jogando.");
+      confetti();
+    }
+    if (!canMove(S.grid)) S.over = true;
+    save(); render();
+  }
+
+  function undo() {
+    if (!S.undo) return;
+    Object.assign(S, S.undo, { undo: null, over: false, mask: null, fresh: null });
+    save(); render();
+  }
+
+  // ------------------------------------------------------------------ render
+  function render(all) {
+    const board = $("board");
+    board.style.setProperty("--n", S.size);
+    board.style.setProperty("--gap", S.size >= 6 ? "6px" : S.size === 5 ? "8px" : "10px");
+    if (board.children.length !== S.size * S.size) {
+      board.innerHTML = "";
+      for (let i = 0; i < S.size * S.size; i++) { const d = document.createElement("div"); d.className = "tile"; d.setAttribute("role", "gridcell"); d.appendChild(document.createElement("span")); board.appendChild(d); }
+    }
+    const isFresh = (r, c) => (S.fresh || []).some((p) => p && p[0] === r && p[1] === c);
+    S.grid.forEach((row, r) => row.forEach((v, c) => {
+      const el = board.children[r * S.size + c];
+      const l = v ? level(v) : null;
+      el.className = "tile";
+      el.style.background = l ? l.c[0] : "";
+      el.style.color = l ? l.c[1] : "";
+      el.firstChild.textContent = l ? l.abbr : "";
+      el.setAttribute("aria-label", l ? l.name : "vazio");
+      if (l && l.abbr.length >= 4) el.classList.add("long");
+      void el.offsetWidth;
+      if (S.mask && S.mask[r][c]) el.classList.add("merged");
+      else if (v && (all || isFresh(r, c))) el.classList.add("pop");
+    }));
+
+    $("score").textContent = S.score.toLocaleString("pt-BR");
+    $("best").textContent = Math.max(bestOf(S.size), S.score).toLocaleString("pt-BR");
+    $("moves").textContent = `Movimentos: ${S.moves}`;
+    const prog = Math.min(1, S.unlocked.filter((v) => DAX[v]).length / ORDER.length);
+    $("bar").style.width = `${prog * 100}%`;
+    $("trail").textContent = `Trilha DAX: ${S.unlocked.filter((v) => DAX[v]).length}/${ORDER.length}`;
+    $("undo").disabled = !S.undo;
+
+    const b = [];
+    if (S.over) b.push('<span class="badge over">FIM DE JOGO</span>');
+    else if (S.grid.flat().some((v) => v >= WIN)) b.push('<span class="badge won">🏆 MESTRE DAX</span>');
+    if (S.daily) b.push(`<span class="badge daily">🗓️ Desafio de ${S.date.split("-").reverse().join("/")}</span>`);
+    $("badges").innerHTML = b.join("");
+
+    $("overlay").classList.toggle("show", S.over);
+    if (S.over) {
+      $("ovText").textContent = `Sem mais movimentos. Você fez ${S.score.toLocaleString("pt-BR")} pontos e chegou a ${level(maxVal(S.grid)).name}.`;
+      $("ovUndo").hidden = !S.undo;
+    }
+    renderDict(); renderOpts();
+  }
+
+  function renderDict() {
+    $("dictList").innerHTML = ORDER.map((v) => {
+      const l = DAX[v], ok = S.unlocked.includes(v);
+      return `<div class="lvl ${ok ? "" : "locked"}"><div class="chip" style="background:${l.c[0]};color:${l.c[1]}">${esc(l.abbr)}</div>
+        <div><b>${ok ? "✅" : "🔒"} ${esc(l.name)}</b><p>${esc(l.desc)}</p>${l.ex ? `<pre>${esc(l.ex)}</pre>` : ""}</div></div>`;
+    }).join("");
+  }
+  function renderOpts() {
+    $("sizes").innerHTML = SIZES.map((n) => `<button class="ghost" data-size="${n}" aria-pressed="${n === S.size}">${n}×${n}</button>`).join("");
+    $("daily").textContent = S.daily ? "🗓️ Desativar desafio diário" : "🗓️ Jogar o desafio de hoje";
+  }
+
+  // ------------------------------------------------------------ toasts/confete
+  function toast(html) {
+    const t = document.createElement("div");
+    t.className = "toast"; t.innerHTML = html;
+    $("toasts").appendChild(t);
+    setTimeout(() => { t.classList.add("out"); setTimeout(() => t.remove(), 300); }, 3800);
+  }
+  function confetti() {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const cv = $("confetti"), ctx = cv.getContext("2d");
+    cv.hidden = false; cv.width = innerWidth; cv.height = innerHeight;
+    const cores = ["#edc22e", "#f65e3b", "#f2b179", "#8f7a66", "#4a90d9"];
+    const p = Array.from({ length: 160 }, () => ({ x: Math.random() * cv.width, y: -20 - Math.random() * cv.height * .5, vx: (Math.random() - .5) * 4, vy: 2 + Math.random() * 4, r: 4 + Math.random() * 5, a: Math.random() * 6, c: cores[Math.floor(Math.random() * cores.length)] }));
+    const t0 = performance.now();
+    (function frame(t) {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      p.forEach((q) => { q.x += q.vx; q.y += q.vy; q.vy += .05; q.a += .1; ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.a); ctx.fillStyle = q.c; ctx.fillRect(-q.r / 2, -q.r / 4, q.r, q.r / 2); ctx.restore(); });
+      if (t - t0 < 3500) requestAnimationFrame(frame); else cv.hidden = true;
+    })(t0);
+  }
+
+  // ---------------------------------------------------------------- entradas
+  const KEYS = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", w: "up", s: "down", a: "left", d: "right" };
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (KEYS[e.key]) { e.preventDefault(); doMove(KEYS[e.key]); }
+    else if (e.key === "z" || e.key === "Z") undo();
+    else if ((e.key === "r" || e.key === "R") && !document.querySelector("dialog[open]")) newBoard(S.size, S.daily);
+  });
+
+  let touch = null;
+  const wrap = $("boardWrap");
+  wrap.addEventListener("pointerdown", (e) => { touch = { x: e.clientX, y: e.clientY }; });
+  wrap.addEventListener("pointerup", (e) => {
+    if (!touch) return;
+    const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+    touch = null;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+    doMove(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+  });
+  wrap.addEventListener("pointercancel", () => { touch = null; });
+
+  $("undo").onclick = undo;
+  $("ovUndo").onclick = undo;
+  $("restart").onclick = () => newBoard(S.size, S.daily);
+  $("ovRestart").onclick = () => newBoard(S.size, S.daily);
+  document.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => $(b.dataset.open).showModal()));
+  document.querySelectorAll("[data-close]").forEach((b) => (b.onclick = () => b.closest("dialog").close()));
+  document.querySelectorAll("dialog").forEach((d) => d.addEventListener("click", (e) => { if (e.target === d) d.close(); }));
+  $("sizes").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-size]");
+    if (b && +b.dataset.size !== S.size) { newBoard(+b.dataset.size, S.daily); $("dlgOpts").close(); }
+  });
+  $("daily").onclick = () => { newBoard(S.size, !S.daily); $("dlgOpts").close(); };
+
+  // ------------------------------------------------------------------ início
+  const salvo = store.get("dax2048:state", null);
+  if (salvo && Array.isArray(salvo.grid) && SIZES.includes(salvo.size) && !(salvo.daily && salvo.date !== hoje())) {
+    S = { ...salvo, mask: null, fresh: null };
+    S.over = !canMove(S.grid);
+    // Continua o desafio diário de onde parou: avança o gerador o mesmo número de jogadas.
+    if (S.daily) { rng = seeded(`${hoje()}-${S.size}`); for (let i = 0; i < 4 + S.moves * 2; i++) rng(); }
+    render(true);
+  } else {
+    newBoard(4, false);
+  }
+})();
+</script>
+</body>
+</html>
